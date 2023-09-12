@@ -21,6 +21,7 @@ $$
     \end{cases} \\
     [\text{BinExpr}] &\to
     \begin{cases}
+        [\text{Expr}] ^{[\text{Expr}]} & \text{prec} = 3 \\ 
         [\text{Expr}] * [\text{Expr}] & \text{prec} = 2 \\
         [\text{Expr}] / [\text{Expr}] & \text{prec} = 2 \\
         [\text{Expr}] + [\text{Expr}] & \text{prec} = 1 \\

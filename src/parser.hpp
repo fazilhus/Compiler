@@ -7,90 +7,14 @@
 #include <cassert>
 #include <variant>
 
-#include "./arena.hpp"
-#include "tokenization.hpp"
+#include "arena.hpp"
+#include "node.hpp"
 
-namespace node {
-
-    struct TermIntLit {
-        Token int_lit;
-    };
-
-    struct TermIdent {
-        Token ident;
-    };
-
-    struct Expr;
-
-    struct TermParen {
-        Expr* expr;
-    };
-
-    struct BinExprAdd {
-        Expr* lhs;
-        Expr* rhs;
-    };
-
-    struct BinExprMult {
-        Expr* lhs;
-        Expr* rhs;
-    };
-
-    struct BinExprSub {
-        Expr* lhs;
-        Expr* rhs;
-    };
-
-    struct BinExprDiv {
-        Expr* lhs;
-        Expr* rhs;
-    };
-
-    struct BinExpr {
-        std::variant<BinExprAdd*, BinExprMult*, BinExprSub*, BinExprDiv*> var;
-    };
-
-    struct Term {
-        std::variant<TermIntLit*, TermIdent*, TermParen*> var;
-    };
-
-    struct Expr {
-        std::variant<Term*, BinExpr*> var;
-    };
-
-    struct Stmt;
-
-    struct StmtExit {
-        Expr* expr;
-    };
-
-    struct StmtLet {
-        Token ident;
-        Expr* expr;
-    };
-
-    struct StmtIdent {
-        Token ident;
-        Expr* expr;
-    };
-
-//    struct StmtIf {
-//        Expr* expr;
-//        std::vector<Stmt*> stmts;
-//    };
-
-    struct Stmt {
-        std::variant<StmtExit*, StmtLet*, StmtIdent*/*, StmtIf**/> var;
-    };
-
-    struct Prog {
-        std::vector<Stmt*> stmts;
-    };
-
-}
 
 std::optional<int> binPrec(TokenType type) {
     switch (type) {
+        case TokenType::pow:
+            return 3;
         case TokenType::mult:
         case TokenType::div:
             return 2;
@@ -112,21 +36,18 @@ class Parser {
 public:
     inline explicit Parser(std::vector<Token> tokens)
             : m_tokens(std::move(tokens))
-            , m_allocator(1024 * 1024 * 4) // 4 mb
-    {
-    }
+            , m_allocator(1024 * 1024 * 4) {}
 
-    std::optional<node::Term*> parseTerm()
-    {
+    std::optional<node::Term*> parseTerm() {
         if (auto intLit = tryConsume(TokenType::int_lit)) {
-            auto termIntLit = m_allocator.alloc<node::TermIntLit>();
+            auto termIntLit = m_allocator.alloc<node::term::IntLit>();
             termIntLit->int_lit = intLit.value();
             auto term = m_allocator.alloc<node::Term>();
             term->var = termIntLit;
             return term;
         }
         else if (auto ident = tryConsume(TokenType::ident)) {
-            auto exprIdent = m_allocator.alloc<node::TermIdent>();
+            auto exprIdent = m_allocator.alloc<node::term::Ident>();
             exprIdent->ident = ident.value();
             auto term = m_allocator.alloc<node::Term>();
             term->var = exprIdent;
@@ -139,7 +60,7 @@ public:
                 exit(EXIT_FAILURE);
             }
             tryConsume(TokenType::close_paren, "Expected `)`");
-            auto termParen = m_allocator.alloc<node::TermParen>();
+            auto termParen = m_allocator.alloc<node::term::Paren>();
             termParen->expr = expr.value();
             auto term = m_allocator.alloc<node::Term>();
             term->var = termParen;
@@ -150,8 +71,7 @@ public:
         }
     }
 
-    std::optional<node::Expr*> parseExpr(int minPrec = 0)
-    {
+    std::optional<node::Expr*> parseExpr(int minPrec = 0) {
         std::optional<node::Term*> termLhs = parseTerm();
         if (!termLhs.has_value()) {
             return {};
@@ -171,6 +91,7 @@ public:
             else {
                 break;
             }
+            
             Token op = consume();
             int nextMinPrec = prec.value() + 1;
             auto expr_rhs = parseExpr(nextMinPrec);
@@ -181,32 +102,67 @@ public:
             auto expr = m_allocator.alloc<node::BinExpr>();
             auto exprLhs2 = m_allocator.alloc<node::Expr>();
             if (op.type == TokenType::plus) {
-                auto add = m_allocator.alloc<node::BinExprAdd>();
+                auto add = m_allocator.alloc<node::binary::ExprAdd>();
                 exprLhs2->var = expr_lhs->var;
                 add->lhs = exprLhs2;
                 add->rhs = expr_rhs.value();
                 expr->var = add;
             }
             else if (op.type == TokenType::mult) {
-                auto multi = m_allocator.alloc<node::BinExprMult>();
+                auto multi = m_allocator.alloc<node::binary::ExprMult>();
                 exprLhs2->var = expr_lhs->var;
                 multi->lhs = exprLhs2;
                 multi->rhs = expr_rhs.value();
                 expr->var = multi;
             }
             else if (op.type == TokenType::sub) {
-                auto sub = m_allocator.alloc<node::BinExprSub>();
+                auto sub = m_allocator.alloc<node::binary::ExprSub>();
                 exprLhs2->var = expr_lhs->var;
                 sub->lhs = exprLhs2;
                 sub->rhs = expr_rhs.value();
                 expr->var = sub;
             }
             else if (op.type == TokenType::div) {
-                auto div = m_allocator.alloc<node::BinExprDiv>();
+                auto div = m_allocator.alloc<node::binary::ExprDiv>();
                 exprLhs2->var = expr_lhs->var;
                 div->lhs = exprLhs2;
                 div->rhs = expr_rhs.value();
                 expr->var = div;
+            }
+            else if (op.type == TokenType::less) {
+                auto less = m_allocator.alloc<node::binary::ExprLess>();
+                exprLhs2->var = expr_lhs->var;
+                less->lhs = exprLhs2;
+                less->rhs = expr_rhs.value();
+                expr->var = less;
+            }
+            else if (op.type == TokenType::lesseq) {
+                auto lesseq = m_allocator.alloc<node::binary::ExprLessOrEq>();
+                exprLhs2->var = expr_lhs->var;
+                lesseq->lhs = exprLhs2;
+                lesseq->rhs = expr_rhs.value();
+                expr->var = lesseq;
+            }
+            else if (op.type == TokenType::greater) {
+                auto greater = m_allocator.alloc<node::binary::ExprGreater>();
+                exprLhs2->var = expr_lhs->var;
+                greater->lhs = exprLhs2;
+                greater->rhs = expr_rhs.value();
+                expr->var = greater;
+            }
+            else if (op.type == TokenType::greatereq) {
+                auto greatereq = m_allocator.alloc<node::binary::ExprGreaterOrEq>();
+                exprLhs2->var = expr_lhs->var;
+                greatereq->lhs = exprLhs2;
+                greatereq->rhs = expr_rhs.value();
+                expr->var = greatereq;
+            }
+            else if (op.type == TokenType::comp) {
+                auto eq = m_allocator.alloc<node::binary::ExprEq>();
+                exprLhs2->var = expr_lhs->var;
+                eq->lhs = exprLhs2;
+                eq->rhs = expr_rhs.value();
+                expr->var = eq;
             }
             else {
                 assert(false); // Unreachable;
@@ -216,13 +172,12 @@ public:
         return expr_lhs;
     }
 
-    std::optional<node::Stmt*> parseStmt()
-    {
+    std::optional<node::Stmt*> parseStmt() {
         if (peek().value().type == TokenType::exit && peek(1).has_value()
             && peek(1).value().type == TokenType::open_paren) {
             consume();
             consume();
-            auto stmtExit = m_allocator.alloc<node::StmtExit>();
+            auto stmtExit = m_allocator.alloc<node::statement::Exit>();
             if (auto nodeExpr = parseExpr()) {
                 stmtExit->expr = nodeExpr.value();
             }
@@ -241,7 +196,7 @@ public:
                 && peek(1).value().type == TokenType::ident && peek(2).has_value()
                 && peek(2).value().type == TokenType::eq) {
             consume();
-            auto stmtLet = m_allocator.alloc<node::StmtLet>();
+            auto stmtLet = m_allocator.alloc<node::statement::Let>();
             stmtLet->ident = consume();
             consume();
             if (auto expr = parseExpr()) {
@@ -259,7 +214,7 @@ public:
         }
         else if (peek().has_value() && peek().value().type == TokenType::ident &&
                 peek(1).has_value() && peek(1).value().type == TokenType::eq) {
-            auto stmtIdent = m_allocator.alloc<node::StmtIdent>();
+            auto stmtIdent = m_allocator.alloc<node::statement::Ident>();
             stmtIdent->ident = consume();
             consume();
             if (auto expr = parseExpr()) {
@@ -279,7 +234,7 @@ public:
 //                peek(1).value().type == TokenType::open_paren) {
 //            consume();
 //            consume();
-//            auto stmtIf = m_allocator.alloc<node::StmtIf>();
+//            auto stmtIf = m_allocator.alloc<node::statement::If>();
 //            if (auto expr = parseExpr()) {
 //                stmtIf->expr = expr.value();
 //            }
@@ -301,15 +256,14 @@ public:
 //                }
 //            }
 //
-//            tryConsume(TokenType::close_curly, "Expecteed '}'");
+//            tryConsume(TokenType::close_curly, "Expected '}'");
 //        }
         else {
             return {};
         }
     }
 
-    std::optional<node::Prog> parseProg()
-    {
+    std::optional<node::Prog> parseProg() {
         node::Prog prog;
         while (peek().has_value()) {
             if (auto stmt = parseStmt()) {
@@ -324,8 +278,7 @@ public:
     }
 
 private:
-    [[nodiscard]] inline std::optional<Token> peek(int offset = 0) const
-    {
+    [[nodiscard]] inline std::optional<Token> peek(int offset = 0) const {
         if (m_index + offset >= m_tokens.size()) {
             return {};
         }
@@ -334,13 +287,11 @@ private:
         }
     }
 
-    inline Token consume()
-    {
+    inline Token consume() {
         return m_tokens.at(m_index++);
     }
 
-    inline Token tryConsume(TokenType type, const std::string& err_msg)
-    {
+    inline Token tryConsume(TokenType type, const std::string& err_msg) {
         if (peek().has_value() && peek().value().type == type) {
             return consume();
         }
@@ -350,8 +301,7 @@ private:
         }
     }
 
-    inline std::optional<Token> tryConsume(TokenType type)
-    {
+    inline std::optional<Token> tryConsume(TokenType type) {
         if (peek().has_value() && peek().value().type == type) {
             return consume();
         }

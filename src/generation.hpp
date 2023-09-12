@@ -18,12 +18,12 @@ public:
         struct TermVisitor {
             Generator* gen;
 
-            void operator()(const node::TermIntLit* termIntLit) const {
+            void operator()(const node::term::IntLit* termIntLit) const {
                 gen->m_output << "\tmov rax, " << termIntLit->int_lit.value.value() << '\n';
                 gen->push("rax");
             }
 
-            void operator()(const node::TermIdent* termIdent) const {
+            void operator()(const node::term::Ident* termIdent) const {
                 if (gen->m_vars.find(termIdent->ident.value.value()) == gen->m_vars.end()) {
                     std::cerr << "Undeclared identifier: " <<  termIdent->ident.value.value() << std::endl;
                     exit(EXIT_FAILURE);
@@ -35,7 +35,7 @@ public:
                 gen->push(offset.str());
             }
 
-            void operator()(const node::TermParen* termParen) const {
+            void operator()(const node::term::Paren* termParen) const {
                 gen->genExpr(termParen->expr);
             }
         };
@@ -48,7 +48,7 @@ public:
         struct BinExprVisitor {
             Generator* gen;
 
-            void operator()(const node::BinExprAdd* binExprAdd) const {
+            void operator()(const node::binary::ExprAdd* binExprAdd) const {
                 gen->genExpr(binExprAdd->lhs);
                 gen->genExpr(binExprAdd->rhs);
                 gen->pop("rbx");
@@ -57,7 +57,7 @@ public:
                 gen->push("rax");
             }
 
-            void operator()(const node::BinExprSub* binExprSub) const {
+            void operator()(const node::binary::ExprSub* binExprSub) const {
                 gen->genExpr(binExprSub->lhs);
                 gen->genExpr(binExprSub->rhs);
                 gen->pop("rbx");
@@ -66,7 +66,7 @@ public:
                 gen->push("rax");
             }
 
-            void operator()(const node::BinExprMult* binExprMult) const {
+            void operator()(const node::binary::ExprMult* binExprMult) const {
                 gen->genExpr(binExprMult->lhs);
                 gen->genExpr(binExprMult->rhs);
                 gen->pop("rbx");
@@ -75,7 +75,7 @@ public:
                 gen->push("rax");
             }
 
-            void operator()(const node::BinExprDiv* binExprDiv) const {
+            void operator()(const node::binary::ExprDiv* binExprDiv) const {
                 gen->genExpr(binExprDiv->lhs);
                 gen->genExpr(binExprDiv->rhs);
                 gen->pop("rbx");
@@ -83,6 +83,8 @@ public:
                 gen->m_output << "\tdiv rbx\n";
                 gen->push("rax");
             }
+
+            //void operator()(const node::binary::)
         };
 
         BinExprVisitor visitor({ .gen = this });
@@ -110,7 +112,7 @@ public:
         struct StmtVisitor {
             Generator* gen;
 
-            void operator()(const node::StmtExit* stmtExit) const {
+            void operator()(const node::statement::Exit* stmtExit) const {
                 gen->b_returned = true;
                 gen->genExpr(stmtExit->expr);
 
@@ -119,7 +121,7 @@ public:
                 gen->m_output << "\tsyscall\n";
             }
             
-            void operator()(const node::StmtLet* stmtLet) const {
+            void operator()(const node::statement::Let* stmtLet) const {
                 if (gen->m_vars.find(stmtLet->ident.value.value()) != gen->m_vars.end()) {
                     std::cerr << "Identifier already exists: " << stmtLet->ident.value.value() << std::endl;
                     exit(EXIT_FAILURE);
@@ -129,7 +131,7 @@ public:
                 gen->genExpr(stmtLet->expr);
             }
 
-            void operator()(const node::StmtIdent* stmtIdent) const {
+            void operator()(const node::statement::Ident* stmtIdent) const {
                 if (gen->m_vars.find(stmtIdent->ident.value.value()) == gen->m_vars.end()) {
                     std::cerr << "Identifier " << stmtIdent->ident.value.value() << " is not declared" << std::endl;
                     exit(EXIT_FAILURE);

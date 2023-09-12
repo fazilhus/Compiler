@@ -10,6 +10,7 @@
 #include <optional>
 #include <unordered_set>
 
+//TODO floating point division
 enum class TokenType {
     exit,
     let,
@@ -41,7 +42,7 @@ struct Token {
 };
 
 bool isOperatorSymbol(char c) {
-    std::unordered_set<char> chars{'<', '>', '=', '!', '/', '*', '+', '-', '^', '%', '|', '&', '(', ')'};
+    std::unordered_set<char> chars{'<', '>', '=', '!', '/', '*', '+', '-', '^', '%', '|', '&'};
     return chars.find(c) != chars.end();
 }
 
@@ -89,7 +90,47 @@ public:
                 buf.clear();
             }
             else if (isOperatorSymbol(peek().value())) {
-
+                buf.push_back(consume());
+                while (peek().has_value() && isOperatorSymbol(peek().value())) {
+                    buf.push_back(consume());
+                }
+                if (buf == "<=") {
+                    tokens.push_back({ .type = TokenType::lesseq });
+                    buf.clear();
+                }
+                else if (buf == ">=") {
+                    tokens.push_back({ .type = TokenType::greatereq });
+                    buf.clear();
+                }
+                else if (buf == "==") {
+                    tokens.push_back({ .type = TokenType::comp });
+                    buf.clear();
+                }
+                else if (buf == "=") {
+                    tokens.push_back({ .type = TokenType::eq });
+                    buf.clear();
+                }
+                else if (buf == "+") {
+                    tokens.push_back({ .type = TokenType::plus });
+                    buf.clear();
+                }
+                else if (buf == "-") {
+                    tokens.push_back({ .type = TokenType::sub });
+                    buf.clear();
+                }
+                else if (buf == "*") {
+                    tokens.push_back({ .type = TokenType::mult });
+                    buf.clear();
+                }
+                else if (buf == "/") {
+                    tokens.push_back({ .type = TokenType::div });
+                    buf.clear();
+                }
+                else {
+                    //TODO logical operators, change and assign (+=) etc
+                    std::cerr << "Unknown symbol" << std::endl;
+                    exit(EXIT_FAILURE);
+                }
             }
             else if (peek().value() == '(') {
                 consume();
@@ -99,34 +140,15 @@ public:
                 consume();
                 tokens.push_back({ .type = TokenType::close_paren });
             }
-//            else if (peek().value() == '{') {
-//                consume();
-//                tokens.push_back({ .type = TokenType::open_curly });
-//            }
-//            else if (peek().value() == '}') {
-//                consume();
-//                tokens.push_back({ .type = TokenType::close_curly });
-//            }
-            else if (peek().value() == '=') {
-                consume();
-                tokens.push_back({ .type = TokenType::eq });
-            }
-            else if (peek().value() == '+') {
-                consume();
-                tokens.push_back({ .type = TokenType::plus });
-            }
-            else if (peek().value() == '-') {
-                consume();
-                tokens.push_back({ .type = TokenType::sub });
-            }
-            else if (peek().value() == '*') {
-                consume();
-                tokens.push_back({ .type = TokenType::mult });
-            }
-            else if (peek().value() == '/') {
-                consume();
-                tokens.push_back({ .type = TokenType::div });
-            }
+            // TODO curly brackets
+            // else if (peek().value() == '{') {
+            //     consume();
+            //     tokens.push_back({ .type = TokenType::open_curly });
+            // }
+            // else if (peek().value() == '}') {
+            //     consume();
+            //     tokens.push_back({ .type = TokenType::close_curly });
+            // }
             else if (peek().value() == ';') {
                 consume();
                 tokens.push_back({ .type = TokenType::semi });
